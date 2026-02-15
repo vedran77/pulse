@@ -38,3 +38,11 @@ type ChannelRepository interface {
 	GetMember(ctx context.Context, channelID, userID uuid.UUID) (*domain.ChannelMember, error)
 	ListMembers(ctx context.Context, channelID uuid.UUID) ([]domain.ChannelMember, error)
 }
+
+type MessageRepository interface {
+	Create(ctx context.Context, msg *domain.Message) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Message, error)
+	ListByChannel(ctx context.Context, channelID uuid.UUID, before *uuid.UUID, limit int) ([]domain.Message, error)
+	Update(ctx context.Context, msg *domain.Message) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
+}

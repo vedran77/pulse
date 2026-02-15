@@ -68,6 +68,24 @@ export interface Channel {
   created_at: string;
 }
 
+export interface Message {
+  id: string;
+  channel_id: string;
+  sender_id: string;
+  content?: string;
+  type: string;
+  parent_id?: string;
+  edited_at?: string;
+  created_at: string;
+  sender_username: string;
+  sender_display_name: string;
+}
+
+export interface MessageListResponse {
+  messages: Message[];
+  has_more: boolean;
+}
+
 // API
 
 export const api = {
@@ -124,5 +142,32 @@ export const api = {
 
   joinChannel(channelId: string) {
     return request<void>(`/channels/${channelId}/join`, { method: "POST" });
+  },
+
+  // Messages
+  listMessages(channelId: string, before?: string, limit = 50) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set("before", before);
+    return request<MessageListResponse>(
+      `/channels/${channelId}/messages?${params}`
+    );
+  },
+
+  sendMessage(channelId: string, content: string) {
+    return request<Message>(`/channels/${channelId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  editMessage(messageId: string, content: string) {
+    return request<Message>(`/messages/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  deleteMessage(messageId: string) {
+    return request<void>(`/messages/${messageId}`, { method: "DELETE" });
   },
 };

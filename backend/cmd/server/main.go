@@ -28,16 +28,19 @@ func main() {
 	userRepo := postgresrepo.NewUserRepo(pool)
 	workspaceRepo := postgresrepo.NewWorkspaceRepo(pool)
 	channelRepo := postgresrepo.NewChannelRepo(pool)
+	messageRepo := postgresrepo.NewMessageRepo(pool)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
 	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo)
 	channelService := service.NewChannelService(channelRepo, workspaceRepo)
+	messageService := service.NewMessageService(messageRepo, channelRepo, workspaceRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	workspaceHandler := handlers.NewWorkspaceHandler(workspaceService)
 	channelHandler := handlers.NewChannelHandler(channelService)
+	messageHandler := handlers.NewMessageHandler(messageService)
 
 	// Auth middleware
 	auth := middleware.Auth(cfg.JWTSecret)
@@ -77,6 +80,12 @@ func main() {
 	mux.Handle("POST /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.AddMember)))
 	mux.Handle("DELETE /api/v1/channels/{id}/members/{uid}", auth(http.HandlerFunc(channelHandler.RemoveMember)))
 	mux.Handle("GET /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.ListMembers)))
+
+	// Protected - Messages
+	mux.Handle("POST /api/v1/channels/{id}/messages", auth(http.HandlerFunc(messageHandler.Send)))
+	mux.Handle("GET /api/v1/channels/{id}/messages", auth(http.HandlerFunc(messageHandler.List)))
+	mux.Handle("PATCH /api/v1/messages/{id}", auth(http.HandlerFunc(messageHandler.Edit)))
+	mux.Handle("DELETE /api/v1/messages/{id}", auth(http.HandlerFunc(messageHandler.Delete)))
 
 	// Start server with CORS
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)

@@ -527,7 +527,81 @@
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
+}
+
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-top: auto;
+}
+
+.message {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: 8px;
+  transition: background 0.1s ease;
+}
+
+.message:hover {
+  background: #222529;
+}
+
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #393b40;
+  display: flex;
+  align-items: center;
   justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.message-own .message-avatar {
+  background: linear-gradient(135deg, #36d1c4, #a855f7);
+}
+
+.message-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.125rem;
+}
+
+.message-sender {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: #5e6066;
+}
+
+.message-edited {
+  font-size: 0.7rem;
+  color: #5e6066;
+  font-style: italic;
+}
+
+.message-text {
+  color: #d1d2d3;
+  font-size: 0.925rem;
+  line-height: 1.45;
+  word-break: break-word;
+  margin: 0;
 }
 
 .messages-empty {

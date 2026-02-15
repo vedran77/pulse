@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api, type Workspace, type Channel } from "../lib/api";
+import { api, type Workspace, type Channel, type Message } from "../lib/api";
 
 export default function WorkspaceView() {
   const { workspaceId } = useParams();
@@ -8,17 +8,20 @@ export default function WorkspaceView() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageInput, setMessageInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
+  // Load workspace + channels
   useEffect(() => {
     if (!workspaceId) return;
 
-    Promise.all([
-      api.getWorkspace(workspaceId),
-      api.listChannels(workspaceId),
-    ])
+    Promise.all([api.getWorkspace(workspaceId), api.listChannels(workspaceId)])
       .then(([ws, chs]) => {
         setWorkspace(ws);
         setChannels(chs);
@@ -27,6 +30,54 @@ export default function WorkspaceView() {
       .catch(() => navigate("/"))
       .finally(() => setLoading(false));
   }, [workspaceId, navigate]);
+
+  // Load messages when channel changes
+  useEffect(() => {
+    if (!activeChannel) return;
+    setMessages([]);
+
+    api
+      .listMessages(activeChannel.id)
+      .then((res) => setMessages(res.messages))
+      .catch(() => {});
+  }, [activeChannel]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Poll for new messages every 3 seconds
+  useEffect(() => {
+    if (!activeChannel) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.listMessages(activeChannel.id);
+        setMessages(res.messages);
+      } catch {
+        // ignore
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeChannel]);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeChannel || !messageInput.trim() || sending) return;
+
+    setSending(true);
+    try {
+      const msg = await api.sendMessage(activeChannel.id, messageInput.trim());
+      setMessages((prev) => [...prev, msg]);
+      setMessageInput("");
+    } catch {
+      // TODO: show error
+    } finally {
+      setSending(false);
+    }
+  }
 
   async function handleCreateChannel(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +97,13 @@ export default function WorkspaceView() {
     }
   }
 
+  function formatTime(dateStr: string) {
+    return new Date(dateStr).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   if (loading) {
     return <div className="workspace-loading">Loading...</div>;
   }
@@ -55,7 +113,10 @@ export default function WorkspaceView() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <button className="sidebar-workspace-btn" onClick={() => navigate("/")}>
+          <button
+            className="sidebar-workspace-btn"
+            onClick={() => navigate("/")}
+          >
             <span className="sidebar-workspace-avatar">
               {workspace?.name.charAt(0).toUpperCase()}
             </span>
@@ -75,7 +136,10 @@ export default function WorkspaceView() {
           </div>
 
           {showCreateChannel && (
-            <form onSubmit={handleCreateChannel} className="sidebar-create-form">
+            <form
+              onSubmit={handleCreateChannel}
+              className="sidebar-create-form"
+            >
               <input
                 type="text"
                 value={newChannelName}
@@ -113,22 +177,56 @@ export default function WorkspaceView() {
                 <p className="main-header-desc">{activeChannel.description}</p>
               )}
             </div>
+
             <div className="messages-area">
-              <div className="messages-empty">
-                <p>No messages yet in #{activeChannel.name}</p>
-                <p className="messages-empty-sub">
-                  Be the first to send a message!
-                </p>
-              </div>
+              {messages.length === 0 ? (
+                <div className="messages-empty">
+                  <p>No messages yet in #{activeChannel.name}</p>
+                  <p className="messages-empty-sub">
+                    Be the first to send a message!
+                  </p>
+                </div>
+              ) : (
+                <div className="messages-list">
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`message ${msg.sender_id === currentUser.id ? "message-own" : ""}`}
+                    >
+                      <div className="message-avatar">
+                        {msg.sender_display_name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="message-body">
+                        <div className="message-meta">
+                          <span className="message-sender">
+                            {msg.sender_display_name}
+                          </span>
+                          <span className="message-time">
+                            {formatTime(msg.created_at)}
+                          </span>
+                          {msg.edited_at && (
+                            <span className="message-edited">(edited)</span>
+                          )}
+                        </div>
+                        <p className="message-text">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
             </div>
-            <div className="message-input-area">
+
+            <form onSubmit={handleSend} className="message-input-area">
               <input
                 type="text"
                 className="message-input"
                 placeholder={`Message #${activeChannel.name}`}
-                disabled
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                disabled={sending}
               />
-            </div>
+            </form>
           </>
         ) : (
           <div className="no-channel">
