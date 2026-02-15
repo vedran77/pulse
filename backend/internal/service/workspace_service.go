@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -19,17 +21,22 @@ var (
 	ErrNotWorkspaceOwner = errors.New("only workspace owner can perform this action")
 	ErrNotMember         = errors.New("user is not a member of this workspace")
 	ErrAlreadyMember     = errors.New("user is already a member")
+	ErrInviteNotFound    = errors.New("invite not found")
+	ErrInviteExpired     = errors.New("invite has expired")
+	ErrInviteUsed        = errors.New("invite has already been used")
 )
 
 type WorkspaceService struct {
 	workspaceRepo repository.WorkspaceRepository
 	userRepo      repository.UserRepository
+	inviteRepo    repository.InviteRepository
 }
 
-func NewWorkspaceService(workspaceRepo repository.WorkspaceRepository, userRepo repository.UserRepository) *WorkspaceService {
+func NewWorkspaceService(workspaceRepo repository.WorkspaceRepository, userRepo repository.UserRepository, inviteRepo repository.InviteRepository) *WorkspaceService {
 	return &WorkspaceService{
 		workspaceRepo: workspaceRepo,
 		userRepo:      userRepo,
+		inviteRepo:    inviteRepo,
 	}
 }
 
@@ -230,6 +237,125 @@ func (s *WorkspaceService) ListMembers(ctx context.Context, userID, workspaceID 
 
 var nonAlphanumeric = regexp.MustCompile(`[^a-z0-9-]`)
 var multiDash = regexp.MustCompile(`-{2,}`)
+
+func (s *WorkspaceService) CreateInvite(ctx context.Context, requesterID, workspaceID uuid.UUID, email string) (*domain.WorkspaceInvite, error) {
+	// Permission check: owner or admin
+	requester, err := s.workspaceRepo.GetMember(ctx, workspaceID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if requester == nil || (requester.Role != "owner" && requester.Role != "admin") {
+		return nil, ErrNotWorkspaceOwner
+	}
+
+	// Generate crypto random token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, fmt.Errorf("generating token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	invite := &domain.WorkspaceInvite{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		Email:       email,
+		Token:       token,
+		InvitedBy:   requesterID,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   time.Now().Add(7 * 24 * time.Hour), // 7 days
+	}
+
+	if err := s.inviteRepo.Create(ctx, invite); err != nil {
+		return nil, fmt.Errorf("creating invite: %w", err)
+	}
+
+	return invite, nil
+}
+
+func (s *WorkspaceService) GetInviteInfo(ctx context.Context, token string) (*domain.WorkspaceInvite, error) {
+	invite, err := s.inviteRepo.GetByToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if invite == nil {
+		return nil, ErrInviteNotFound
+	}
+	return invite, nil
+}
+
+func (s *WorkspaceService) AcceptInvite(ctx context.Context, userID uuid.UUID, token string) (*domain.WorkspaceInvite, error) {
+	invite, err := s.inviteRepo.GetByToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if invite == nil {
+		return nil, ErrInviteNotFound
+	}
+
+	if invite.AcceptedAt != nil {
+		return nil, ErrInviteUsed
+	}
+	if time.Now().After(invite.ExpiresAt) {
+		return nil, ErrInviteExpired
+	}
+
+	// If already a member, just return success (redirect to workspace)
+	existing, err := s.workspaceRepo.GetMember(ctx, invite.WorkspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return invite, nil
+	}
+
+	// Add user as member
+	member := &domain.WorkspaceMember{
+		WorkspaceID: invite.WorkspaceID,
+		UserID:      userID,
+		Role:        "member",
+		JoinedAt:    time.Now(),
+	}
+	if err := s.workspaceRepo.AddMember(ctx, member); err != nil {
+		return nil, fmt.Errorf("adding member: %w", err)
+	}
+
+	// Mark invite as accepted
+	if err := s.inviteRepo.MarkAccepted(ctx, invite.ID, userID); err != nil {
+		return nil, fmt.Errorf("marking invite accepted: %w", err)
+	}
+
+	now := time.Now()
+	invite.AcceptedAt = &now
+	invite.AcceptedBy = &userID
+
+	return invite, nil
+}
+
+func (s *WorkspaceService) ListInvites(ctx context.Context, requesterID, workspaceID uuid.UUID) ([]domain.WorkspaceInvite, error) {
+	// Permission check
+	member, err := s.workspaceRepo.GetMember(ctx, workspaceID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if member == nil {
+		return nil, ErrNotMember
+	}
+
+	return s.inviteRepo.ListByWorkspace(ctx, workspaceID)
+}
+
+func (s *WorkspaceService) RevokeInvite(ctx context.Context, requesterID, workspaceID, inviteID uuid.UUID) error {
+	// Permission check: owner or admin
+	requester, err := s.workspaceRepo.GetMember(ctx, workspaceID, requesterID)
+	if err != nil {
+		return err
+	}
+	if requester == nil || (requester.Role != "owner" && requester.Role != "admin") {
+		return ErrNotWorkspaceOwner
+	}
+
+	return s.inviteRepo.Delete(ctx, inviteID)
+}
 
 func slugify(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))

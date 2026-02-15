@@ -9,8 +9,8 @@ import (
 
 // Hub manages all active WebSocket clients and routes messages.
 type Hub struct {
-	// clients maps userID → client.
-	clients map[uuid.UUID]*Client
+	// clients maps userID → set of clients (supports multiple tabs).
+	clients map[uuid.UUID]map[*Client]struct{}
 
 	register   chan *Client
 	unregister chan *Client
@@ -25,11 +25,20 @@ type broadcastMsg struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[uuid.UUID]*Client),
+		clients:    make(map[uuid.UUID]map[*Client]struct{}),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *broadcastMsg, 256),
 	}
+}
+
+// totalClients returns the total number of connected clients.
+func (h *Hub) totalClients() int {
+	n := 0
+	for _, set := range h.clients {
+		n += len(set)
+	}
+	return n
 }
 
 // Run starts the Hub's main event loop. Call this in a goroutine.
@@ -37,40 +46,53 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			h.clients[client.userID] = client
-			log.Printf("ws hub: user %s connected (%d total)", client.userID, len(h.clients))
+			if h.clients[client.userID] == nil {
+				h.clients[client.userID] = make(map[*Client]struct{})
+			}
+			wasEmpty := len(h.clients[client.userID]) == 0
+			h.clients[client.userID][client] = struct{}{}
+			log.Printf("ws hub: user %s connected (%d total)", client.userID, h.totalClients())
 
-			// Broadcast presence online
-			h.broadcastPresence(client.userID, "online")
+			// Broadcast presence online only on first connection
+			if wasEmpty {
+				h.broadcastPresence(client.userID, "online")
+			}
 
 		case client := <-h.unregister:
-			if _, ok := h.clients[client.userID]; ok {
-				delete(h.clients, client.userID)
-				close(client.send)
-				close(client.done)
-				log.Printf("ws hub: user %s disconnected (%d total)", client.userID, len(h.clients))
+			if set, ok := h.clients[client.userID]; ok {
+				if _, exists := set[client]; exists {
+					delete(set, client)
+					close(client.send)
+					close(client.done)
+					log.Printf("ws hub: user %s disconnected (%d total)", client.userID, h.totalClients())
 
-				// Broadcast presence offline
-				h.broadcastPresence(client.userID, "offline")
+					// Broadcast presence offline only when last connection drops
+					if len(set) == 0 {
+						delete(h.clients, client.userID)
+						h.broadcastPresence(client.userID, "offline")
+					}
+				}
 			}
 
 		case msg := <-h.broadcast:
-			for _, client := range h.clients {
+			for userID, set := range h.clients {
 				// Skip excluded user
-				if msg.excludeID != nil && client.userID == *msg.excludeID {
+				if msg.excludeID != nil && userID == *msg.excludeID {
 					continue
 				}
-				// Only send to clients subscribed to this channel
-				if !client.IsSubscribed(msg.channelID) {
-					continue
-				}
-				select {
-				case client.send <- msg.data:
-				default:
-					// Client buffer full - disconnect
-					delete(h.clients, client.userID)
-					close(client.send)
-					close(client.done)
+				for client := range set {
+					// Only send to clients subscribed to this channel
+					if !client.IsSubscribed(msg.channelID) {
+						continue
+					}
+					select {
+					case client.send <- msg.data:
+					default:
+						// Client buffer full - disconnect
+						delete(set, client)
+						close(client.send)
+						close(client.done)
+					}
 				}
 			}
 		}
@@ -91,16 +113,18 @@ func (h *Hub) BroadcastToChannel(channelID uuid.UUID, event *Event, excludeUserI
 	}
 }
 
-// BroadcastToUser sends an event directly to a specific user.
+// BroadcastToUser sends an event directly to a specific user (all tabs).
 func (h *Hub) BroadcastToUser(userID uuid.UUID, event *Event) {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return
 	}
-	if client, ok := h.clients[userID]; ok {
-		select {
-		case client.send <- data:
-		default:
+	if set, ok := h.clients[userID]; ok {
+		for client := range set {
+			select {
+			case client.send <- data:
+			default:
+			}
 		}
 	}
 }
@@ -140,13 +164,15 @@ func (h *Hub) broadcastPresence(userID uuid.UUID, status string) {
 	if err != nil {
 		return
 	}
-	for _, client := range h.clients {
-		if client.userID == userID {
+	for uid, set := range h.clients {
+		if uid == userID {
 			continue
 		}
-		select {
-		case client.send <- data:
-		default:
+		for client := range set {
+			select {
+			case client.send <- data:
+			default:
+			}
 		}
 	}
 }

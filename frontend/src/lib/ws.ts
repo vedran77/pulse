@@ -58,8 +58,19 @@ export class PulseWebSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private shouldReconnect = true;
   private typingThrottles = new Map<string, number>();
+  private subscribedChannels = new Set<string>();
 
   connect(callbacks: WSCallbacks) {
+    // Close any existing connection first
+    if (this.ws) {
+      this.shouldReconnect = false;
+      this.ws.close();
+      this.ws = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.callbacks = callbacks;
     this.shouldReconnect = true;
     this.doConnect();
@@ -73,6 +84,13 @@ export class PulseWebSocket {
 
     this.ws.onopen = () => {
       this.reconnectDelay = 1000;
+      // Re-subscribe to any pending channels
+      for (const chId of this.subscribedChannels) {
+        this.send({
+          type: "channel.subscribe",
+          payload: { channel_id: chId },
+        });
+      }
       this.callbacks.onConnect?.();
     };
 
@@ -140,16 +158,18 @@ export class PulseWebSocket {
   }
 
   subscribe(channelId: string) {
+    this.subscribedChannels.add(channelId);
     this.send({
       type: "channel.subscribe",
-      payload: JSON.stringify({ channel_id: channelId }),
+      payload: { channel_id: channelId },
     });
   }
 
   unsubscribe(channelId: string) {
+    this.subscribedChannels.delete(channelId);
     this.send({
       type: "channel.unsubscribe",
-      payload: JSON.stringify({ channel_id: channelId }),
+      payload: { channel_id: channelId },
     });
   }
 
@@ -178,6 +198,7 @@ export class PulseWebSocket {
       this.reconnectTimer = null;
     }
     this.typingThrottles.clear();
+    this.subscribedChannels.clear();
     this.ws?.close();
     this.ws = null;
   }

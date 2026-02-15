@@ -86,6 +86,30 @@ export interface MessageListResponse {
   has_more: boolean;
 }
 
+export interface WorkspaceInvite {
+  id: string;
+  workspace_id: string;
+  email: string;
+  token: string;
+  invited_by: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at?: string;
+  accepted_by?: string;
+}
+
+export interface InviteInfo {
+  workspace_name: string;
+  email: string;
+  expires_at: string;
+  accepted: boolean;
+}
+
+export interface CreateInviteResponse {
+  invite: WorkspaceInvite;
+  link: string;
+}
+
 // API
 
 export const api = {
@@ -169,5 +193,33 @@ export const api = {
 
   deleteMessage(messageId: string) {
     return request<void>(`/messages/${messageId}`, { method: "DELETE" });
+  },
+
+  // Invites
+  createInvite(workspaceId: string, email: string) {
+    return request<CreateInviteResponse>(`/workspaces/${workspaceId}/invites`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  listInvites(workspaceId: string) {
+    return request<WorkspaceInvite[]>(`/workspaces/${workspaceId}/invites`);
+  },
+
+  revokeInvite(workspaceId: string, inviteId: string) {
+    return request<void>(`/workspaces/${workspaceId}/invites/${inviteId}`, {
+      method: "DELETE",
+    });
+  },
+
+  getInviteInfo(token: string) {
+    return request<InviteInfo>(`/invites/${token}`);
+  },
+
+  acceptInvite(token: string) {
+    return request<{ workspace_id: string }>(`/invites/${token}/accept`, {
+      method: "POST",
+    });
   },
 };

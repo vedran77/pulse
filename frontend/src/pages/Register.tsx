@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { registerSchema } from "../lib/validation";
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -39,7 +41,7 @@ export default function Register() {
       const res = await api.register(result.data);
       localStorage.setItem("access_token", res.access_token);
       localStorage.setItem("user", JSON.stringify(res.user));
-      navigate("/");
+      navigate(redirect || "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -115,7 +117,7 @@ export default function Register() {
         </form>
 
         <p className="auth-link">
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account? <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login"}>Sign in</Link>
         </p>
       </div>
     </div>

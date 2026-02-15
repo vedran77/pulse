@@ -39,6 +39,14 @@ type ChannelRepository interface {
 	ListMembers(ctx context.Context, channelID uuid.UUID) ([]domain.ChannelMember, error)
 }
 
+type InviteRepository interface {
+	Create(ctx context.Context, invite *domain.WorkspaceInvite) error
+	GetByToken(ctx context.Context, token string) (*domain.WorkspaceInvite, error)
+	ListByWorkspace(ctx context.Context, workspaceID uuid.UUID) ([]domain.WorkspaceInvite, error)
+	MarkAccepted(ctx context.Context, id, userID uuid.UUID) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 type MessageRepository interface {
 	Create(ctx context.Context, msg *domain.Message) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Message, error)

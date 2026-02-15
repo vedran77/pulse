@@ -30,10 +30,11 @@ func main() {
 	workspaceRepo := postgresrepo.NewWorkspaceRepo(pool)
 	channelRepo := postgresrepo.NewChannelRepo(pool)
 	messageRepo := postgresrepo.NewMessageRepo(pool)
+	inviteRepo := postgresrepo.NewInviteRepo(pool)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
-	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo)
+	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo, inviteRepo)
 	channelService := service.NewChannelService(channelRepo, workspaceRepo)
 	messageService := service.NewMessageService(messageRepo, channelRepo, workspaceRepo)
 
@@ -73,6 +74,17 @@ func main() {
 	mux.Handle("POST /api/v1/workspaces/{id}/members", auth(http.HandlerFunc(workspaceHandler.AddMember)))
 	mux.Handle("DELETE /api/v1/workspaces/{id}/members/{uid}", auth(http.HandlerFunc(workspaceHandler.RemoveMember)))
 	mux.Handle("GET /api/v1/workspaces/{id}/members", auth(http.HandlerFunc(workspaceHandler.ListMembers)))
+
+	// Protected - Workspace Invites
+	mux.Handle("POST /api/v1/workspaces/{id}/invites", auth(http.HandlerFunc(workspaceHandler.CreateInvite)))
+	mux.Handle("GET /api/v1/workspaces/{id}/invites", auth(http.HandlerFunc(workspaceHandler.ListInvites)))
+	mux.Handle("DELETE /api/v1/workspaces/{id}/invites/{inviteId}", auth(http.HandlerFunc(workspaceHandler.RevokeInvite)))
+
+	// Public - Invite Info
+	mux.HandleFunc("GET /api/v1/invites/{token}", workspaceHandler.GetInviteInfo)
+
+	// Protected - Accept Invite
+	mux.Handle("POST /api/v1/invites/{token}/accept", auth(http.HandlerFunc(workspaceHandler.AcceptInvite)))
 
 	// Protected - Channels
 	mux.Handle("POST /api/v1/workspaces/{wid}/channels", auth(http.HandlerFunc(channelHandler.Create)))

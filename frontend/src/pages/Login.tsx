@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { loginSchema } from "../lib/validation";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -31,7 +33,7 @@ export default function Login() {
       const res = await api.login(result.data);
       localStorage.setItem("access_token", res.access_token);
       localStorage.setItem("user", JSON.stringify(res.user));
-      navigate("/");
+      navigate(redirect || "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -81,7 +83,7 @@ export default function Login() {
         </form>
 
         <p className="auth-link">
-          Don't have an account? <Link to="/register">Create one</Link>
+          Don't have an account? <Link to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : "/register"}>Create one</Link>
         </p>
       </div>
     </div>

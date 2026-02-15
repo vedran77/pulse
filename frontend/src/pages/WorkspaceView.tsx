@@ -15,6 +15,10 @@ export default function WorkspaceView() {
   const [sending, setSending] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [inviteError, setInviteError] = useState("");
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(
     new Map()
   );
@@ -23,7 +27,7 @@ export default function WorkspaceView() {
   const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const [currentUser] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
 
   // Keep ref in sync for WS callbacks
   useEffect(() => {
@@ -181,6 +185,21 @@ export default function WorkspaceView() {
     }
   }
 
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workspaceId || !inviteEmail.trim()) return;
+    setInviteError("");
+    setInviteLink("");
+
+    try {
+      const res = await api.createInvite(workspaceId, inviteEmail.trim());
+      setInviteLink(window.location.origin + res.link);
+      setInviteEmail("");
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to create invite");
+    }
+  }
+
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     setMessageInput(e.target.value);
     if (activeChannel && e.target.value.trim()) {
@@ -258,6 +277,56 @@ export default function WorkspaceView() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">
+            <span>Invite People</span>
+            <button
+              className="sidebar-add-btn"
+              onClick={() => { setShowInvite(!showInvite); setInviteLink(""); setInviteError(""); }}
+            >
+              +
+            </button>
+          </div>
+
+          {showInvite && (
+            <div style={{ padding: "0 0.75rem 0.5rem" }}>
+              <form onSubmit={handleInvite} className="sidebar-create-form">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  autoFocus
+                />
+              </form>
+              {inviteError && (
+                <p style={{ color: "var(--error, #e74c3c)", fontSize: "0.75rem", margin: "0.25rem 0" }}>{inviteError}</p>
+              )}
+              {inviteLink && (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-secondary, #999)", margin: "0 0 0.25rem" }}>Share this link:</p>
+                  <div style={{ display: "flex", gap: "0.25rem" }}>
+                    <input
+                      type="text"
+                      value={inviteLink}
+                      readOnly
+                      style={{ flex: 1, fontSize: "0.7rem", padding: "0.25rem" }}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      type="button"
+                      style={{ fontSize: "0.7rem", padding: "0.25rem 0.5rem", cursor: "pointer" }}
+                      onClick={() => navigator.clipboard.writeText(inviteLink)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 
