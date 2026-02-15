@@ -16,10 +16,18 @@ var (
 	ErrNotMessageOwner = errors.New("only the message sender can perform this action")
 )
 
+// Notifier broadcasts real-time events to connected clients.
+type Notifier interface {
+	NotifyNewMessage(msg *domain.Message)
+	NotifyEditedMessage(msg *domain.Message)
+	NotifyDeletedMessage(channelID, messageID uuid.UUID)
+}
+
 type MessageService struct {
 	messageRepo   repository.MessageRepository
 	channelRepo   repository.ChannelRepository
 	workspaceRepo repository.WorkspaceRepository
+	notifier      Notifier
 }
 
 func NewMessageService(
@@ -32,6 +40,11 @@ func NewMessageService(
 		channelRepo:   channelRepo,
 		workspaceRepo: workspaceRepo,
 	}
+}
+
+// SetNotifier sets the real-time notifier (optional dependency).
+func (s *MessageService) SetNotifier(n Notifier) {
+	s.notifier = n
 }
 
 type SendMessageInput struct {
@@ -73,6 +86,10 @@ func (s *MessageService) Send(ctx context.Context, userID, channelID uuid.UUID, 
 	full, err := s.messageRepo.GetByID(ctx, msg.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.notifier != nil {
+		s.notifier.NotifyNewMessage(full)
 	}
 
 	return full, nil
@@ -125,7 +142,16 @@ func (s *MessageService) Edit(ctx context.Context, userID, messageID uuid.UUID, 
 		return nil, fmt.Errorf("updating message: %w", err)
 	}
 
-	return s.messageRepo.GetByID(ctx, msg.ID)
+	updated, err := s.messageRepo.GetByID(ctx, msg.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.notifier != nil {
+		s.notifier.NotifyEditedMessage(updated)
+	}
+
+	return updated, nil
 }
 
 func (s *MessageService) Delete(ctx context.Context, userID, messageID uuid.UUID) error {
@@ -140,7 +166,15 @@ func (s *MessageService) Delete(ctx context.Context, userID, messageID uuid.UUID
 		return ErrNotMessageOwner
 	}
 
-	return s.messageRepo.SoftDelete(ctx, messageID)
+	if err := s.messageRepo.SoftDelete(ctx, messageID); err != nil {
+		return err
+	}
+
+	if s.notifier != nil {
+		s.notifier.NotifyDeletedMessage(msg.ChannelID, messageID)
+	}
+
+	return nil
 }
 
 func (s *MessageService) checkChannelAccess(ctx context.Context, userID, channelID uuid.UUID) error {

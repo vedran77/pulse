@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, type Workspace, type Channel, type Message } from "../lib/api";
+import { pulseWS } from "../lib/ws";
 
 export default function WorkspaceView() {
   const { workspaceId } = useParams();
@@ -14,8 +15,20 @@ export default function WorkspaceView() {
   const [sending, setSending] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(
+    new Map()
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeChannelRef = useRef<Channel | null>(null);
+  const typingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  // Keep ref in sync for WS callbacks
+  useEffect(() => {
+    activeChannelRef.current = activeChannel;
+  }, [activeChannel]);
 
   // Load workspace + channels
   useEffect(() => {
@@ -35,6 +48,7 @@ export default function WorkspaceView() {
   useEffect(() => {
     if (!activeChannel) return;
     setMessages([]);
+    setTypingUsers(new Map());
 
     api
       .listMessages(activeChannel.id)
@@ -47,20 +61,87 @@ export default function WorkspaceView() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Poll for new messages every 3 seconds
+  // WS callbacks
+  const handleWSMessage = useCallback((msg: Message) => {
+    const current = activeChannelRef.current;
+    if (!current || msg.channel_id !== current.id) return;
+    setMessages((prev) => {
+      // Avoid duplicates (e.g. from optimistic update)
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  }, []);
+
+  const handleWSMessageEdited = useCallback((msg: Message) => {
+    const current = activeChannelRef.current;
+    if (!current || msg.channel_id !== current.id) return;
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
+  }, []);
+
+  const handleWSMessageDeleted = useCallback(
+    (channelId: string, messageId: string) => {
+      const current = activeChannelRef.current;
+      if (!current || channelId !== current.id) return;
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    },
+    []
+  );
+
+  const handleWSTyping = useCallback(
+    (channelId: string, payload: { user_id: string; display_name: string }) => {
+      const current = activeChannelRef.current;
+      if (!current || channelId !== current.id) return;
+      if (payload.user_id === currentUser.id) return;
+
+      const name = payload.display_name || payload.user_id.slice(0, 8);
+
+      setTypingUsers((prev) => {
+        const next = new Map(prev);
+        next.set(payload.user_id, name);
+        return next;
+      });
+
+      // Clear after 3s
+      const existing = typingTimers.current.get(payload.user_id);
+      if (existing) clearTimeout(existing);
+      typingTimers.current.set(
+        payload.user_id,
+        setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = new Map(prev);
+            next.delete(payload.user_id);
+            return next;
+          });
+          typingTimers.current.delete(payload.user_id);
+        }, 3000)
+      );
+    },
+    [currentUser.id]
+  );
+
+  // Connect WebSocket
+  useEffect(() => {
+    pulseWS.connect({
+      onMessage: handleWSMessage,
+      onMessageEdited: handleWSMessageEdited,
+      onMessageDeleted: handleWSMessageDeleted,
+      onTyping: handleWSTyping,
+    });
+
+    return () => {
+      pulseWS.disconnect();
+    };
+  }, [handleWSMessage, handleWSMessageEdited, handleWSMessageDeleted, handleWSTyping]);
+
+  // Subscribe/unsubscribe on channel change
   useEffect(() => {
     if (!activeChannel) return;
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.listMessages(activeChannel.id);
-        setMessages(res.messages);
-      } catch {
-        // ignore
-      }
-    }, 3000);
+    pulseWS.subscribe(activeChannel.id);
 
-    return () => clearInterval(interval);
+    return () => {
+      pulseWS.unsubscribe(activeChannel.id);
+    };
   }, [activeChannel]);
 
   async function handleSend(e: React.FormEvent) {
@@ -70,7 +151,10 @@ export default function WorkspaceView() {
     setSending(true);
     try {
       const msg = await api.sendMessage(activeChannel.id, messageInput.trim());
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
       setMessageInput("");
     } catch {
       // TODO: show error
@@ -97,12 +181,24 @@ export default function WorkspaceView() {
     }
   }
 
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setMessageInput(e.target.value);
+    if (activeChannel && e.target.value.trim()) {
+      pulseWS.sendTyping(activeChannel.id);
+    }
+  }
+
   function formatTime(dateStr: string) {
     return new Date(dateStr).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
   }
+
+  const typingText =
+    typingUsers.size > 0
+      ? Array.from(typingUsers.values()).join(", ") + " is typing..."
+      : null;
 
   if (loading) {
     return <div className="workspace-loading">Loading...</div>;
@@ -217,13 +313,17 @@ export default function WorkspaceView() {
               )}
             </div>
 
+            {typingText && (
+              <div className="typing-indicator">{typingText}</div>
+            )}
+
             <form onSubmit={handleSend} className="message-input-area">
               <input
                 type="text"
                 className="message-input"
                 placeholder={`Message #${activeChannel.name}`}
                 value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
+                onChange={handleInputChange}
                 disabled={sending}
               />
             </form>

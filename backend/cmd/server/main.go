@@ -11,6 +11,7 @@ import (
 	"github.com/vedran77/pulse/internal/service"
 	"github.com/vedran77/pulse/internal/transport/http/handlers"
 	"github.com/vedran77/pulse/internal/transport/http/middleware"
+	"github.com/vedran77/pulse/internal/transport/ws"
 )
 
 func main() {
@@ -35,6 +36,11 @@ func main() {
 	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo)
 	channelService := service.NewChannelService(channelRepo, workspaceRepo)
 	messageService := service.NewMessageService(messageRepo, channelRepo, workspaceRepo)
+
+	// WebSocket Hub
+	hub := ws.NewHub()
+	go hub.Run()
+	messageService.SetNotifier(ws.NewHubNotifier(hub))
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -80,6 +86,9 @@ func main() {
 	mux.Handle("POST /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.AddMember)))
 	mux.Handle("DELETE /api/v1/channels/{id}/members/{uid}", auth(http.HandlerFunc(channelHandler.RemoveMember)))
 	mux.Handle("GET /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.ListMembers)))
+
+	// WebSocket (auth via query param)
+	mux.HandleFunc("GET /ws", ws.ServeWS(hub, cfg.JWTSecret))
 
 	// Protected - Messages
 	mux.Handle("POST /api/v1/channels/{id}/messages", auth(http.HandlerFunc(messageHandler.Send)))
