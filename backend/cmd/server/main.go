@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/vedran77/pulse/internal/config"
+	"github.com/vedran77/pulse/internal/database"
 )
 
 func main() {
@@ -21,4 +22,13 @@ func main() {
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
 	log.Printf("Starting server on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
+
+	pool, err := database.Connect(cfg)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer pool.Close()
+	log.Println("Connected to database")
 }
