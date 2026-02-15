@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { User } from "../lib/api";
+import type { User } from "../lib/api";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -20,6 +20,7 @@ export default function Home() {
   return (
     <div className="home-container">
       <div className="home-card">
+        <img src="/logo.png" alt="Pulse" className="home-logo" />
         <h1>Welcome, {user.display_name}!</h1>
         <p>You're signed in as <strong>@{user.username}</strong></p>
         <p className="home-email">{user.email}</p>

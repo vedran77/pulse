@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/vedran77/pulse/internal/service"
+	"github.com/vedran77/pulse/pkg/validator"
 )
 
 type AuthHandler struct {
@@ -24,13 +25,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Email == "" || input.Username == "" || input.Password == "" || input.DisplayName == "" {
-		writeError(w, http.StatusBadRequest, "MISSING_FIELDS", "All fields are required")
-		return
-	}
-
-	if len(input.Password) < 8 {
-		writeError(w, http.StatusBadRequest, "WEAK_PASSWORD", "Password must be at least 8 characters")
+	if errs := validator.ValidateRegister(input.Email, input.Username, input.DisplayName, input.Password); errs.HasErrors() {
+		writeValidationErrors(w, errs)
 		return
 	}
 
@@ -58,8 +54,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Email == "" || input.Password == "" {
-		writeError(w, http.StatusBadRequest, "MISSING_FIELDS", "Email and password are required")
+	if errs := validator.ValidateLogin(input.Email, input.Password); errs.HasErrors() {
+		writeValidationErrors(w, errs)
 		return
 	}
 
@@ -88,6 +84,15 @@ func writeError(w http.ResponseWriter, status int, code string, message string) 
 		"error": map[string]string{
 			"code":    code,
 			"message": message,
+		},
+	})
+}
+
+func writeValidationErrors(w http.ResponseWriter, errs validator.ValidationErrors) {
+	writeJSON(w, http.StatusBadRequest, map[string]any{
+		"error": map[string]any{
+			"code":   "VALIDATION_ERROR",
+			"fields": errs,
 		},
 	})
 }

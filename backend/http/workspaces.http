@@ -1,0 +1,65 @@
+@base = http://localhost:8080/api/v1
+@token = YOUR_TOKEN_HERE
+
+### Create Workspace
+POST {{base}}/workspaces
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "My Team",
+  "slug": "my-team",
+  "description": "Our main workspace"
+}
+
+### List My Workspaces
+GET {{base}}/workspaces
+Authorization: Bearer {{token}}
+
+### Get Workspace by ID
+GET {{base}}/workspaces/WORKSPACE_ID_HERE
+Authorization: Bearer {{token}}
+
+### Update Workspace
+PATCH {{base}}/workspaces/WORKSPACE_ID_HERE
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "My Awesome Team",
+  "description": "Updated description"
+}
+
+### Delete Workspace
+DELETE {{base}}/workspaces/WORKSPACE_ID_HERE
+Authorization: Bearer {{token}}
+
+### Add Member to Workspace
+POST {{base}}/workspaces/WORKSPACE_ID_HERE/members
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "user_id": "USER_ID_HERE"
+}
+
+### List Workspace Members
+GET {{base}}/workspaces/WORKSPACE_ID_HERE/members
+Authorization: Bearer {{token}}
+
+### Remove Member from Workspace
+DELETE {{base}}/workspaces/WORKSPACE_ID_HERE/members/USER_ID_HERE
+Authorization: Bearer {{token}}
+
+### Validation: empty name (should return 400)
+POST {{base}}/workspaces
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "",
+  "slug": "test"
+}
+
+### No auth token (should return 401)
+GET {{base}}/workspaces

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { registerSchema } from "../lib/validation";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -9,20 +10,33 @@ export default function Register() {
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
+    setFieldErrors({});
 
-    try {
-      const res = await api.register({
-        email,
-        username,
-        display_name: displayName,
-        password,
+    const result = registerSchema.safeParse({
+      email,
+      username,
+      display_name: displayName,
+      password,
+    });
+
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        errors[issue.path[0] as string] = issue.message;
       });
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.register(result.data);
       localStorage.setItem("access_token", res.access_token);
       localStorage.setItem("user", JSON.stringify(res.user));
       navigate("/");
@@ -36,6 +50,7 @@ export default function Register() {
   return (
     <div className="auth-container">
       <div className="auth-card">
+        <img src="/logo.png" alt="Pulse" className="auth-logo" />
         <h1>Pulse</h1>
         <p className="auth-subtitle">Create your account</p>
 
@@ -50,8 +65,9 @@ export default function Register() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="John Doe"
-              required
+              className={fieldErrors.display_name ? "input-error" : ""}
             />
+            {fieldErrors.display_name && <span className="field-error">{fieldErrors.display_name}</span>}
           </div>
 
           <div className="form-group">
@@ -62,8 +78,9 @@ export default function Register() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="johndoe"
-              required
+              className={fieldErrors.username ? "input-error" : ""}
             />
+            {fieldErrors.username && <span className="field-error">{fieldErrors.username}</span>}
           </div>
 
           <div className="form-group">
@@ -74,8 +91,9 @@ export default function Register() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              required
+              className={fieldErrors.email ? "input-error" : ""}
             />
+            {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
           </div>
 
           <div className="form-group">
@@ -86,9 +104,9 @@ export default function Register() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min. 8 characters"
-              required
-              minLength={8}
+              className={fieldErrors.password ? "input-error" : ""}
             />
+            {fieldErrors.password && <span className="field-error">{fieldErrors.password}</span>}
           </div>
 
           <button type="submit" className="auth-button" disabled={loading}>

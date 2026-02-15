@@ -43,7 +43,7 @@ Content-Type: application/json
   "password": "test1234"
 }
 
-### Register - weak password (should return 400)
+### Register - weak password (should return 400 VALIDATION_ERROR)
 POST {{base}}/auth/register
 Content-Type: application/json
 
@@ -52,4 +52,26 @@ Content-Type: application/json
   "username": "weak",
   "display_name": "Weak",
   "password": "123"
+}
+
+### Register - invalid username (should return 400 VALIDATION_ERROR)
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "username": "no spaces!",
+  "display_name": "Test",
+  "password": "Test1234"
+}
+
+### Register - multiple validation errors (should return 400 VALIDATION_ERROR)
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "username": "a",
+  "display_name": "",
+  "password": "short"
 }
