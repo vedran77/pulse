@@ -1,0 +1,55 @@
+@base = http://localhost:8080/api/v1
+
+### Health Check
+GET http://localhost:8080/health
+
+### Register
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "vedran@test.com",
+  "username": "vedran",
+  "display_name": "Vedran",
+  "password": "test1234"
+}
+
+### Login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vedran@test.com",
+  "password": "test1234"
+}
+
+### Login - wrong password (should return 401)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vedran@test.com",
+  "password": "wrongpassword"
+}
+
+### Register - duplicate email (should return 409)
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "vedran@test.com",
+  "username": "vedran2",
+  "display_name": "Vedran 2",
+  "password": "test1234"
+}
+
+### Register - weak password (should return 400)
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "weak@test.com",
+  "username": "weak",
+  "display_name": "Weak",
+  "password": "123"
+}
