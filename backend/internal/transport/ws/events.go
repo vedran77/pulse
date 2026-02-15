@@ -23,6 +23,9 @@ const (
 	EventTypeMessageNew     = "message.new"
 	EventTypeMessageEdited  = "message.edited"
 	EventTypeMessageDeleted = "message.deleted"
+	EventTypeDMNew          = "dm.new"
+	EventTypeDMEdited       = "dm.edited"
+	EventTypeDMDeleted      = "dm.deleted"
 	EventTypeTyping         = "typing"
 	EventTypePresence       = "presence"
 	EventTypePong           = "pong"
@@ -55,6 +58,14 @@ type MessagePayload struct {
 }
 
 type MessageDeletedPayload struct {
+	ID uuid.UUID `json:"id"`
+}
+
+type DMMessagePayload struct {
+	domain.DMMessage
+}
+
+type DMMessageDeletedPayload struct {
 	ID uuid.UUID `json:"id"`
 }
 

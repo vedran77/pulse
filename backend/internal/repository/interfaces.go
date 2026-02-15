@@ -54,3 +54,15 @@ type MessageRepository interface {
 	Update(ctx context.Context, msg *domain.Message) error
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 }
+
+type DMRepository interface {
+	CreateConversation(ctx context.Context, conv *domain.DMConversation) error
+	GetConversationByUsers(ctx context.Context, user1ID, user2ID uuid.UUID) (*domain.DMConversation, error)
+	GetConversationByID(ctx context.Context, id uuid.UUID) (*domain.DMConversation, error)
+	ListConversations(ctx context.Context, userID uuid.UUID) ([]domain.DMConversation, error)
+	CreateMessage(ctx context.Context, msg *domain.DMMessage) error
+	GetMessageByID(ctx context.Context, id uuid.UUID) (*domain.DMMessage, error)
+	ListMessages(ctx context.Context, conversationID uuid.UUID, before *uuid.UUID, limit int) ([]domain.DMMessage, error)
+	UpdateMessage(ctx context.Context, msg *domain.DMMessage) error
+	SoftDeleteMessage(ctx context.Context, id uuid.UUID) error
+}

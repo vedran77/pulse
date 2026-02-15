@@ -1,10 +1,13 @@
-import type { Message } from "./api";
+import type { Message, DMMessage } from "./api";
 
 // Event types matching backend
 type EventType =
   | "message.new"
   | "message.edited"
   | "message.deleted"
+  | "dm.new"
+  | "dm.edited"
+  | "dm.deleted"
   | "typing"
   | "presence"
   | "pong"
@@ -41,6 +44,9 @@ export type WSCallbacks = {
   onMessage?: (msg: Message) => void;
   onMessageEdited?: (msg: Message) => void;
   onMessageDeleted?: (channelId: string, messageId: string) => void;
+  onDMMessage?: (msg: DMMessage) => void;
+  onDMMessageEdited?: (msg: DMMessage) => void;
+  onDMMessageDeleted?: (conversationId: string, messageId: string) => void;
   onTyping?: (channelId: string, payload: TypingPayload) => void;
   onPresence?: (payload: PresencePayload) => void;
   onConnect?: () => void;
@@ -138,6 +144,17 @@ export class PulseWebSocket {
       case "message.deleted": {
         const p = event.payload as MessageDeletedPayload;
         this.callbacks.onMessageDeleted?.(event.channel_id!, p.id);
+        break;
+      }
+      case "dm.new":
+        this.callbacks.onDMMessage?.(event.payload as DMMessage);
+        break;
+      case "dm.edited":
+        this.callbacks.onDMMessageEdited?.(event.payload as DMMessage);
+        break;
+      case "dm.deleted": {
+        const p = event.payload as MessageDeletedPayload;
+        this.callbacks.onDMMessageDeleted?.(event.channel_id!, p.id);
         break;
       }
       case "typing":

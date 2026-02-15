@@ -20,6 +20,9 @@ type WorkspaceMember struct {
 	UserID      uuid.UUID `json:"user_id"`
 	Role        string    `json:"role"`
 	JoinedAt    time.Time `json:"joined_at"`
+	// Joined fields
+	Username    string `json:"username,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 type WorkspaceInvite struct {

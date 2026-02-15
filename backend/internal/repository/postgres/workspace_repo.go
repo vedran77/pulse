@@ -99,7 +99,12 @@ func (r *WorkspaceRepo) GetMember(ctx context.Context, workspaceID, userID uuid.
 }
 
 func (r *WorkspaceRepo) ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]domain.WorkspaceMember, error) {
-	query := `SELECT workspace_id, user_id, role, joined_at FROM workspace_members WHERE workspace_id = $1 ORDER BY joined_at`
+	query := `
+		SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.username, u.display_name
+		FROM workspace_members wm
+		JOIN users u ON wm.user_id = u.id
+		WHERE wm.workspace_id = $1
+		ORDER BY wm.joined_at`
 
 	rows, err := r.pool.Query(ctx, query, workspaceID)
 	if err != nil {
@@ -110,7 +115,7 @@ func (r *WorkspaceRepo) ListMembers(ctx context.Context, workspaceID uuid.UUID) 
 	var members []domain.WorkspaceMember
 	for rows.Next() {
 		var m domain.WorkspaceMember
-		if err := rows.Scan(&m.WorkspaceID, &m.UserID, &m.Role, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.WorkspaceID, &m.UserID, &m.Role, &m.JoinedAt, &m.Username, &m.DisplayName); err != nil {
 			return nil, err
 		}
 		members = append(members, m)

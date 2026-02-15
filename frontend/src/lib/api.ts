@@ -86,6 +86,41 @@ export interface MessageListResponse {
   has_more: boolean;
 }
 
+export interface DMConversation {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  created_at: string;
+  other_user_id: string;
+  other_username: string;
+  other_display_name: string;
+}
+
+export interface DMMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content?: string;
+  edited_at?: string;
+  created_at: string;
+  sender_username: string;
+  sender_display_name: string;
+}
+
+export interface DMMessageListResponse {
+  messages: DMMessage[];
+  has_more: boolean;
+}
+
+export interface WorkspaceMember {
+  workspace_id: string;
+  user_id: string;
+  role: string;
+  joined_at: string;
+  username: string;
+  display_name: string;
+}
+
 export interface WorkspaceInvite {
   id: string;
   workspace_id: string;
@@ -147,6 +182,10 @@ export const api = {
 
   getWorkspace(id: string) {
     return request<Workspace>(`/workspaces/${id}`);
+  },
+
+  listWorkspaceMembers(workspaceId: string) {
+    return request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`);
   },
 
   // Channels
@@ -221,5 +260,43 @@ export const api = {
     return request<{ workspace_id: string }>(`/invites/${token}/accept`, {
       method: "POST",
     });
+  },
+
+  // Direct Messages
+  getOrCreateDM(userId: string) {
+    return request<DMConversation>("/dm/conversations", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId }),
+    });
+  },
+
+  listDMConversations() {
+    return request<DMConversation[]>("/dm/conversations");
+  },
+
+  listDMMessages(conversationId: string, before?: string, limit = 50) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set("before", before);
+    return request<DMMessageListResponse>(
+      `/dm/conversations/${conversationId}/messages?${params}`
+    );
+  },
+
+  sendDMMessage(conversationId: string, content: string) {
+    return request<DMMessage>(`/dm/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  editDMMessage(messageId: string, content: string) {
+    return request<DMMessage>(`/dm/messages/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  deleteDMMessage(messageId: string) {
+    return request<void>(`/dm/messages/${messageId}`, { method: "DELETE" });
   },
 };

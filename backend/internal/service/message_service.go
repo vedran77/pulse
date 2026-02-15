@@ -21,6 +21,10 @@ type Notifier interface {
 	NotifyNewMessage(msg *domain.Message)
 	NotifyEditedMessage(msg *domain.Message)
 	NotifyDeletedMessage(channelID, messageID uuid.UUID)
+	// DM notifications
+	NotifyNewDM(msg *domain.DMMessage)
+	NotifyEditedDM(msg *domain.DMMessage)
+	NotifyDeletedDM(conversationID, messageID uuid.UUID)
 }
 
 type MessageService struct {

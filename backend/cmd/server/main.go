@@ -31,23 +31,28 @@ func main() {
 	channelRepo := postgresrepo.NewChannelRepo(pool)
 	messageRepo := postgresrepo.NewMessageRepo(pool)
 	inviteRepo := postgresrepo.NewInviteRepo(pool)
+	dmRepo := postgresrepo.NewDMRepo(pool)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
 	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo, inviteRepo)
 	channelService := service.NewChannelService(channelRepo, workspaceRepo)
 	messageService := service.NewMessageService(messageRepo, channelRepo, workspaceRepo)
+	dmService := service.NewDMService(dmRepo, userRepo)
 
 	// WebSocket Hub
 	hub := ws.NewHub()
 	go hub.Run()
-	messageService.SetNotifier(ws.NewHubNotifier(hub))
+	hubNotifier := ws.NewHubNotifier(hub)
+	messageService.SetNotifier(hubNotifier)
+	dmService.SetNotifier(hubNotifier)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	workspaceHandler := handlers.NewWorkspaceHandler(workspaceService)
 	channelHandler := handlers.NewChannelHandler(channelService)
 	messageHandler := handlers.NewMessageHandler(messageService)
+	dmHandler := handlers.NewDMHandler(dmService)
 
 	// Auth middleware
 	auth := middleware.Auth(cfg.JWTSecret)
@@ -107,6 +112,14 @@ func main() {
 	mux.Handle("GET /api/v1/channels/{id}/messages", auth(http.HandlerFunc(messageHandler.List)))
 	mux.Handle("PATCH /api/v1/messages/{id}", auth(http.HandlerFunc(messageHandler.Edit)))
 	mux.Handle("DELETE /api/v1/messages/{id}", auth(http.HandlerFunc(messageHandler.Delete)))
+
+	// Protected - Direct Messages
+	mux.Handle("POST /api/v1/dm/conversations", auth(http.HandlerFunc(dmHandler.GetOrCreateConversation)))
+	mux.Handle("GET /api/v1/dm/conversations", auth(http.HandlerFunc(dmHandler.ListConversations)))
+	mux.Handle("POST /api/v1/dm/conversations/{id}/messages", auth(http.HandlerFunc(dmHandler.SendMessage)))
+	mux.Handle("GET /api/v1/dm/conversations/{id}/messages", auth(http.HandlerFunc(dmHandler.ListMessages)))
+	mux.Handle("PATCH /api/v1/dm/messages/{id}", auth(http.HandlerFunc(dmHandler.EditMessage)))
+	mux.Handle("DELETE /api/v1/dm/messages/{id}", auth(http.HandlerFunc(dmHandler.DeleteMessage)))
 
 	// Start server with CORS
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
