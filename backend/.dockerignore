@@ -1,0 +1,22 @@
+# Dependencies & build cache
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker compose (dev only)
+docker-compose.yml
+
+# HTTP test files
+http/
+
+# Git
+.git/
+.gitignore
+
+# Binaries
+server
+*.exe

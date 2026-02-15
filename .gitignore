@@ -1,1 +1,28 @@
+# Plans (personal notes)
 plans
+
+# Environment
+.env
+
+# Binaries
+backend/server
+*.exe
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+dist/
+tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
