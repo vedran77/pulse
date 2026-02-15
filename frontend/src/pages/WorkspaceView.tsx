@@ -49,12 +49,7 @@ export default function WorkspaceView() {
     new Map()
   );
   const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
-  const [showNewDM, setShowNewDM] = useState(false);
-  const [newDMUsername, setNewDMUsername] = useState("");
-  const [dmError, setDmError] = useState("");
-  const [unreadDMs, setUnreadDMs] = useState<Set<string>>(new Set());
   const [channelsCollapsed, setChannelsCollapsed] = useState(false);
-  const [dmsCollapsed, setDmsCollapsed] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
@@ -139,11 +134,6 @@ export default function WorkspaceView() {
         .listDMMessages(activeView.conversation.id)
         .then((res) => setMessages(res.messages))
         .catch(() => {});
-      setUnreadDMs((prev) => {
-        const next = new Set(prev);
-        next.delete(activeView.conversation.id);
-        return next;
-      });
     }
   }, [activeView]);
 
@@ -190,12 +180,6 @@ export default function WorkspaceView() {
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
-      });
-    } else {
-      setUnreadDMs((prev) => {
-        const next = new Set(prev);
-        next.add(msg.conversation_id);
-        return next;
       });
     }
   }, []);
@@ -344,6 +328,7 @@ export default function WorkspaceView() {
       // TODO: show error
     } finally {
       setSending(false);
+      textareaRef.current?.focus();
     }
   }
 
@@ -384,36 +369,6 @@ export default function WorkspaceView() {
       setShowCreateChannel(false);
     } catch {
       // TODO: show error
-    }
-  }
-
-  async function handleNewDM(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newDMUsername.trim()) return;
-    setDmError("");
-
-    try {
-      const members = await api.listWorkspaceMembers(workspaceId!);
-      const target = members.find(
-        (m) => m.username.toLowerCase() === newDMUsername.trim().toLowerCase()
-      );
-      if (!target) {
-        setDmError("User not found in this workspace");
-        return;
-      }
-
-      const conv = await api.getOrCreateDM(target.user_id);
-      setDmConversations((prev) => {
-        if (prev.some((c) => c.id === conv.id)) return prev;
-        return [conv, ...prev];
-      });
-      setActiveView({ type: "dm", conversation: conv });
-      setNewDMUsername("");
-      setShowNewDM(false);
-    } catch (err) {
-      setDmError(
-        err instanceof Error ? err.message : "Failed to create conversation"
-      );
     }
   }
 
@@ -754,73 +709,6 @@ export default function WorkspaceView() {
           {/* Separator */}
           <div className="sidebar-separator" />
 
-          {/* Direct Messages category */}
-          <div className="sidebar-category">
-            <div className="sidebar-category-header">
-              <span
-                className="sidebar-category-label"
-                onClick={() => setDmsCollapsed(!dmsCollapsed)}
-              >
-                <span
-                  className={`sidebar-category-arrow ${dmsCollapsed ? "collapsed" : ""}`}
-                >
-                  &#9662;
-                </span>
-                Direct Messages
-              </span>
-              <button
-                className="sidebar-add-btn"
-                onClick={() => {
-                  setShowNewDM(!showNewDM);
-                  setDmError("");
-                }}
-              >
-                +
-              </button>
-            </div>
-
-            {showNewDM && (
-              <div style={{ padding: "0 12px" }}>
-                <form onSubmit={handleNewDM} className="sidebar-create-form">
-                  <input
-                    type="text"
-                    value={newDMUsername}
-                    onChange={(e) => setNewDMUsername(e.target.value)}
-                    placeholder="username"
-                    autoFocus
-                  />
-                </form>
-                {dmError && (
-                  <p className="invite-error" style={{ padding: "0 12px" }}>
-                    {dmError}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {!dmsCollapsed && (
-              <div className="channel-list">
-                {dmConversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    className={`channel-item ${activeView?.type === "dm" && activeView.conversation.id === conv.id ? "active" : ""} ${unreadDMs.has(conv.id) ? "unread" : ""}`}
-                    onClick={() =>
-                      setActiveView({ type: "dm", conversation: conv })
-                    }
-                  >
-                    <span className="dm-avatar">
-                      {conv.other_display_name?.charAt(0).toUpperCase()}
-                    </span>
-                    {conv.other_display_name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Separator */}
-          <div className="sidebar-separator" />
-
           {/* Pulsemates category */}
           <div className="sidebar-category">
             <div className="sidebar-category-header">
@@ -1114,7 +1002,6 @@ export default function WorkspaceView() {
                   value={messageInput}
                   onChange={handleTextareaChange}
                   onKeyDown={handleTextareaKeyDown}
-                  disabled={sending}
                   rows={1}
                 />
                 <button
