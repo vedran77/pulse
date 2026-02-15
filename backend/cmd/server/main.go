@@ -32,6 +32,7 @@ func main() {
 	messageRepo := postgresrepo.NewMessageRepo(pool)
 	inviteRepo := postgresrepo.NewInviteRepo(pool)
 	dmRepo := postgresrepo.NewDMRepo(pool)
+	pulsemateRepo := postgresrepo.NewPulsemateRepo(pool)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
@@ -39,6 +40,7 @@ func main() {
 	channelService := service.NewChannelService(channelRepo, workspaceRepo)
 	messageService := service.NewMessageService(messageRepo, channelRepo, workspaceRepo)
 	dmService := service.NewDMService(dmRepo, userRepo)
+	pulsemateService := service.NewPulsemateService(pulsemateRepo, userRepo)
 
 	// WebSocket Hub
 	hub := ws.NewHub()
@@ -53,6 +55,7 @@ func main() {
 	channelHandler := handlers.NewChannelHandler(channelService)
 	messageHandler := handlers.NewMessageHandler(messageService)
 	dmHandler := handlers.NewDMHandler(dmService)
+	pulsemateHandler := handlers.NewPulsemateHandler(pulsemateService)
 
 	// Auth middleware
 	auth := middleware.Auth(cfg.JWTSecret)
@@ -120,6 +123,16 @@ func main() {
 	mux.Handle("GET /api/v1/dm/conversations/{id}/messages", auth(http.HandlerFunc(dmHandler.ListMessages)))
 	mux.Handle("PATCH /api/v1/dm/messages/{id}", auth(http.HandlerFunc(dmHandler.EditMessage)))
 	mux.Handle("DELETE /api/v1/dm/messages/{id}", auth(http.HandlerFunc(dmHandler.DeleteMessage)))
+
+	// Protected - Pulsemates
+	mux.Handle("POST /api/v1/pulsemates/requests", auth(http.HandlerFunc(pulsemateHandler.SendRequest)))
+	mux.Handle("GET /api/v1/pulsemates", auth(http.HandlerFunc(pulsemateHandler.ListPulsemates)))
+	mux.Handle("GET /api/v1/pulsemates/requests/incoming", auth(http.HandlerFunc(pulsemateHandler.ListIncomingRequests)))
+	mux.Handle("GET /api/v1/pulsemates/requests/outgoing", auth(http.HandlerFunc(pulsemateHandler.ListOutgoingRequests)))
+	mux.Handle("POST /api/v1/pulsemates/requests/{id}/accept", auth(http.HandlerFunc(pulsemateHandler.AcceptRequest)))
+	mux.Handle("POST /api/v1/pulsemates/requests/{id}/reject", auth(http.HandlerFunc(pulsemateHandler.RejectRequest)))
+	mux.Handle("DELETE /api/v1/pulsemates/requests/{id}", auth(http.HandlerFunc(pulsemateHandler.CancelRequest)))
+	mux.Handle("DELETE /api/v1/pulsemates/{userId}", auth(http.HandlerFunc(pulsemateHandler.RemovePulsemate)))
 
 	// Start server with CORS
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)

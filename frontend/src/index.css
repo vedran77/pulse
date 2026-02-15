@@ -1,3 +1,36 @@
+:root {
+  /* Surfaces — Midnight Lavender */
+  --bg-base: #18171c;
+  --bg-surface: #1e1d24;
+  --bg-elevated: #25242c;
+  --bg-hover: rgba(168, 85, 247, 0.06);
+  --bg-active: rgba(168, 85, 247, 0.10);
+
+  /* Text */
+  --text-primary: #e8e6ef;
+  --text-secondary: #9d99ab;
+  --text-tertiary: #5f5b6b;
+
+  /* Brand — used sparingly */
+  --brand: #a855f7;
+  --brand-secondary: #36d1c4;
+  --brand-gradient: linear-gradient(135deg, #36d1c4, #a855f7, #ec4899);
+  --brand-gradient-subtle: linear-gradient(135deg, rgba(54, 209, 196, 0.15), rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.15));
+  --brand-glow: 0 0 20px rgba(168, 85, 247, 0.15);
+
+  /* Status */
+  --status-online: #36d1c4;
+  --status-danger: #ef4444;
+
+  /* Sizing */
+  --sidebar-width: 280px;
+
+  /* Radius — soft but not bubbly */
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-avatar: 10px;  /* Pulse signature: rounded square avatars */
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -5,13 +38,31 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
-  background-color: #1a1d21;
-  color: #d1d2d3;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
   min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+}
+
+/* Pulse Line — signature gradient line at top */
+#root::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand-gradient);
+  z-index: 9999;
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.35);
+  color: #fff;
 }

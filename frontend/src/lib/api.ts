@@ -112,6 +112,29 @@ export interface DMMessageListResponse {
   has_more: boolean;
 }
 
+export interface PulsemateRequest {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: string;
+  created_at: string;
+  sender_username?: string;
+  sender_display_name?: string;
+  receiver_username?: string;
+  receiver_display_name?: string;
+}
+
+export interface Pulsemate {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  created_at: string;
+  other_user_id: string;
+  other_username: string;
+  other_display_name: string;
+  other_status: string;
+}
+
 export interface WorkspaceMember {
   workspace_id: string;
   user_id: string;
@@ -298,5 +321,41 @@ export const api = {
 
   deleteDMMessage(messageId: string) {
     return request<void>(`/dm/messages/${messageId}`, { method: "DELETE" });
+  },
+
+  // Pulsemates
+  sendPulsemateRequest(username: string) {
+    return request<PulsemateRequest | { status: string }>("/pulsemates/requests", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+  },
+
+  listPulsemates() {
+    return request<Pulsemate[]>("/pulsemates");
+  },
+
+  listIncomingRequests() {
+    return request<PulsemateRequest[]>("/pulsemates/requests/incoming");
+  },
+
+  listOutgoingRequests() {
+    return request<PulsemateRequest[]>("/pulsemates/requests/outgoing");
+  },
+
+  acceptPulsemateRequest(id: string) {
+    return request<void>(`/pulsemates/requests/${id}/accept`, { method: "POST" });
+  },
+
+  rejectPulsemateRequest(id: string) {
+    return request<void>(`/pulsemates/requests/${id}/reject`, { method: "POST" });
+  },
+
+  cancelPulsemateRequest(id: string) {
+    return request<void>(`/pulsemates/requests/${id}`, { method: "DELETE" });
+  },
+
+  removePulsemate(userId: string) {
+    return request<void>(`/pulsemates/${userId}`, { method: "DELETE" });
   },
 };

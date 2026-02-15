@@ -10,7 +10,13 @@ export default function WorkspacePicker() {
   useEffect(() => {
     api
       .listWorkspaces()
-      .then((ws) => setWorkspaces(ws))
+      .then((ws) => {
+        if (ws.length === 1) {
+          navigate(`/w/${ws[0].id}`, { replace: true });
+          return;
+        }
+        setWorkspaces(ws);
+      })
       .catch(() => navigate("/login"))
       .finally(() => setLoading(false));
   }, [navigate]);
