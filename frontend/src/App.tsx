@@ -1,16 +1,20 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Home from "./pages/Home";
+import WorkspacePicker from "./pages/WorkspacePicker";
+import CreateWorkspace from "./pages/CreateWorkspace";
+import WorkspaceView from "./pages/WorkspaceView";
 import "./App.css";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<WorkspacePicker />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/create-workspace" element={<CreateWorkspace />} />
+        <Route path="/w/:workspaceId" element={<WorkspaceView />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

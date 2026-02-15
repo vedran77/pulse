@@ -26,3 +26,15 @@ type WorkspaceRepository interface {
 	GetMember(ctx context.Context, workspaceID, userID uuid.UUID) (*domain.WorkspaceMember, error)
 	ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]domain.WorkspaceMember, error)
 }
+
+type ChannelRepository interface {
+	Create(ctx context.Context, channel *domain.Channel) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Channel, error)
+	ListByWorkspace(ctx context.Context, workspaceID uuid.UUID) ([]domain.Channel, error)
+	Update(ctx context.Context, channel *domain.Channel) error
+	Archive(ctx context.Context, id uuid.UUID) error
+	AddMember(ctx context.Context, member *domain.ChannelMember) error
+	RemoveMember(ctx context.Context, channelID, userID uuid.UUID) error
+	GetMember(ctx context.Context, channelID, userID uuid.UUID) (*domain.ChannelMember, error)
+	ListMembers(ctx context.Context, channelID uuid.UUID) ([]domain.ChannelMember, error)
+}

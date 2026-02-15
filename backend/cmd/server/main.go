@@ -27,14 +27,17 @@ func main() {
 	// Repositories
 	userRepo := postgresrepo.NewUserRepo(pool)
 	workspaceRepo := postgresrepo.NewWorkspaceRepo(pool)
+	channelRepo := postgresrepo.NewChannelRepo(pool)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
 	workspaceService := service.NewWorkspaceService(workspaceRepo, userRepo)
+	channelService := service.NewChannelService(channelRepo, workspaceRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	workspaceHandler := handlers.NewWorkspaceHandler(workspaceService)
+	channelHandler := handlers.NewChannelHandler(channelService)
 
 	// Auth middleware
 	auth := middleware.Auth(cfg.JWTSecret)
@@ -61,6 +64,19 @@ func main() {
 	mux.Handle("POST /api/v1/workspaces/{id}/members", auth(http.HandlerFunc(workspaceHandler.AddMember)))
 	mux.Handle("DELETE /api/v1/workspaces/{id}/members/{uid}", auth(http.HandlerFunc(workspaceHandler.RemoveMember)))
 	mux.Handle("GET /api/v1/workspaces/{id}/members", auth(http.HandlerFunc(workspaceHandler.ListMembers)))
+
+	// Protected - Channels
+	mux.Handle("POST /api/v1/workspaces/{wid}/channels", auth(http.HandlerFunc(channelHandler.Create)))
+	mux.Handle("GET /api/v1/workspaces/{wid}/channels", auth(http.HandlerFunc(channelHandler.List)))
+	mux.Handle("GET /api/v1/channels/{id}", auth(http.HandlerFunc(channelHandler.Get)))
+	mux.Handle("PATCH /api/v1/channels/{id}", auth(http.HandlerFunc(channelHandler.Update)))
+	mux.Handle("DELETE /api/v1/channels/{id}", auth(http.HandlerFunc(channelHandler.Archive)))
+
+	// Protected - Channel Members
+	mux.Handle("POST /api/v1/channels/{id}/join", auth(http.HandlerFunc(channelHandler.Join)))
+	mux.Handle("POST /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.AddMember)))
+	mux.Handle("DELETE /api/v1/channels/{id}/members/{uid}", auth(http.HandlerFunc(channelHandler.RemoveMember)))
+	mux.Handle("GET /api/v1/channels/{id}/members", auth(http.HandlerFunc(channelHandler.ListMembers)))
 
 	// Start server with CORS
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)

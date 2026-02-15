@@ -103,6 +103,25 @@ func ValidateWorkspace(name, slug string) ValidationErrors {
 	return errs
 }
 
+func ValidateChannel(name, chType string) ValidationErrors {
+	errs := make(ValidationErrors)
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		errs.Add("name", "Channel name is required")
+	} else if len(name) < 2 {
+		errs.Add("name", "Channel name must be at least 2 characters")
+	} else if len(name) > 100 {
+		errs.Add("name", "Channel name is too long")
+	}
+
+	if chType != "" && chType != "public" && chType != "private" && chType != "dm" {
+		errs.Add("type", "Channel type must be public, private, or dm")
+	}
+
+	return errs
+}
+
 func validatePassword(password string, errs ValidationErrors) {
 	if len(password) < 8 {
 		errs.Add("password", "Password must be at least 8 characters")
